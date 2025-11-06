@@ -36,6 +36,8 @@ Objective: To deliver curated, high-quality, and analytics-ready data by aggrega
 
 Steps:
 * Explore and identify Business Objects.
+  ![business objects](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/images/business_objects.png)
 * Identify Fact and Dimension Tables.
 * Build the Data Model.
+  ![data model](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/images/data_model.png)
 * Create and run scripts to create fact and dimension tables that are ready for data analysis.
