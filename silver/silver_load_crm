@@ -1,0 +1,130 @@
+-- Scripts for loading transformed and clean data in crm tables under Silver Layer.
+
+-- Table name: silver.crm_cust_info
+-- Script for loading cleaned bronze.cust_info data into the table above
+-- Running this script will truncate existing contents of the above table, then loads current data from the 
+-- file specified in the directory
+
+TRUNCATE TABLE silver.crm_cust_info;
+
+INSERT INTO silver.crm_cust_info (
+	cst_id,
+	cst_key,
+	cst_firstname,
+	cst_lastname,
+	cst_marital_status,
+	cst_gndr,
+	cst_create_date
+)
+SELECT
+	cst_id,
+	cst_key,
+	INITCAP(TRIM(cst_firstname)) as cst_firstname_new,
+	INITCAP(TRIM(cst_lastname)) as cst_lastname_new,
+	CASE 
+		WHEN UPPER(TRIM(cst_marital_status)) = 'M' THEN 'Married'
+		WHEN UPPER(TRIM(cst_marital_status)) = 'S' THEN 'Single'
+		ELSE 'N/A'
+	END as cst_marital_status_new,
+	CASE 
+		WHEN UPPER(TRIM(cst_gndr)) = 'M' THEN 'Male'
+		WHEN UPPER(TRIM(cst_gndr)) = 'F' THEN 'Female'
+		ELSE 'N/A'
+	END as cst_gndr_new,
+	cst_create_date
+FROM (
+	SELECT *,
+	ROW_NUMBER() OVER (PARTITION BY cst_id ORDER BY cst_create_date DESC) AS rownum
+	FROM bronze.crm_cust_info
+)
+WHERE
+	rownum = 1 AND cst_id IS NOT NULL;
+
+
+-- ========================================================================================================================
+-- Table name: silver.crm_prd_info
+-- Script for loading cleaned bronze.cust_info data into the table above
+-- Running this script will truncate existing contents of the above table, then loads current data from the 
+-- file specified in the directory
+
+TRUNCATE TABLE silver.crm_prd_info;
+
+INSERT INTO silver.crm_prd_info (
+prd_id,
+cat_id, -- added cat_id from splitting the prd_key from bronze layer
+prd_key,
+prd_nm,
+prd_cost,
+prd_line,
+prd_start_dt,
+prd_end_dt
+)
+SELECT
+	prd_id,
+	substring(prd_key FROM 1 FOR 5 ) AS cat_key,
+	substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new,
+	prd_nm,
+	CAST(COALESCE(prd_cost, 0) AS DECIMAL(10,2)) as prd_cost_new,
+	CASE
+		WHEN TRIM(prd_line) = 'M' THEN 'Mountain'
+		WHEN TRIM(prd_line) = 'R' THEN 'Road'
+		WHEN TRIM(prd_line) = 'S' THEN 'Other sales'
+		WHEN TRIM(prd_line) = 'T' THEN 'Touring'
+		ELSE 'N/A'
+	END as prd_line_new,
+	prd_start_dt,
+	CASE
+		WHEN prd_start_dt > prd_end_dt THEN (LEAD(prd_start_dt) OVER (PARTITION BY prd_key ORDER BY prd_start_dt)) - 1
+        ELSE prd_end_dt
+	END as prd_end_dt_new
+FROM(
+	SELECT
+		*,
+		ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+	FROM bronze.crm_prd_info)
+WHERE rownum = 1;
+
+-- ========================================================================================================================
+-- Table name: silver.crm_sales_details
+-- Script for loading cleaned bronze.sales_details data into the table above
+-- Running this script will truncate existing contents of the above table, then loads current data from the 
+-- file specified in the directory
+
+TRUNCATE TABLE silver.crm_sales_details;
+
+INSERT INTO silver.crm_sales_details(
+sls_ord_num,
+sls_prd_key,
+sls_cust_id,
+sls_order_dt,
+sls_ship_dt,
+sls_due_dt,
+sls_sales,
+sls_quantity,
+sls_price
+)
+SELECT
+	sls_ord_num,
+	sls_prd_key,
+	sls_cust_id,
+	CASE
+		WHEN sls_order_dt IS NULL OR 
+			 LENGTH(CAST(sls_order_dt AS TEXT)) != 8 OR
+			 sls_order_dt > sls_ship_dt
+		THEN to_date(sls_ship_dt::TEXT, 'YYYYMMDD') - 7
+		ELSE to_date(sls_order_dt::TEXT, 'YYYYMMDD')
+	END as sls_order_dt_new,
+	to_date(sls_ship_dt::TEXT, 'YYYYMMDD') AS sls_ship_dt_new,
+	to_date(sls_due_dt::TEXT, 'YYYYMMDD') AS sls_due_dt_new,
+	CASE
+		WHEN sls_sales IS NULL OR sls_sales < 0 OR sls_sales != ABS(sls_quantity * sls_price)
+		THEN CAST(ABS(sls_quantity * sls_price) AS DECIMAL(10,2))
+		ELSE CAST(sls_sales AS DECIMAL(10,2))
+	END AS sls_sales_new,
+	sls_quantity,
+	CASE
+		WHEN sls_price IS NULL OR sls_price = 0 THEN CAST(ABS(sls_sales / sls_quantity) AS DECIMAL(10,2))
+		WHEN sls_price < 0 THEN CAST(ABS(sls_price) AS DECIMAL(10,2))
+		ELSE CAST(sls_price AS DECIMAL(10,2))
+	END AS sls_price_new
+FROM bronze.crm_sales_details;
