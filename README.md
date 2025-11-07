@@ -40,4 +40,4 @@ Steps:
 * Identify Fact and Dimension Tables.
 * Build the Data Model.
   ![data model](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/images/data_model.png)
-* Create and run scripts to create fact and dimension tables that are ready for data analysis.
+* Create and run scripts to create fact and dimension tables that are ready for data analysis. ([creating fact and dim tables](https://github.com/carigokva/Project1_SQL_Data_Warehouse/tree/main/gold))
