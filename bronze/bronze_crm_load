@@ -1,4 +1,4 @@
--- Scripts for loading table into crm files under bronze layer.
+-- Scripts for loading crm data into tables under bronze layer.
 
 -- Table name: bronze.crm_cust_info
 -- Script for loading raw cust_info.csv into the table above
