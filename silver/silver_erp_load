@@ -1,0 +1,74 @@
+-- Scripts for loading transformed and clean data in erp tables under Silver Layer.
+
+-- Table name: silver.erp_cust_az12
+-- Script for loading cleaned bronze.erp_cust_az12 data into the table above
+-- Running this script will truncate existing contents of the above table, then loads current data from the 
+-- file specified in the directory
+
+TRUNCATE TABLE silver.erp_cust_az12;
+INSERT INTO silver.erp_cust_az12 (
+cid,
+bdate,
+gen
+)
+SELECT
+	CASE
+		WHEN TRIM(cid) LIKE 'NAS%' THEN SUBSTRING(TRIM(cid) FROM 4)
+		WHEN TRIM(cid) LIKE 'AW0%' THEN TRIM(cid)
+		ELSE NULL
+	END AS cid_new,
+	CASE
+		WHEN bdate > CURRENT_DATE THEN NULL
+		ELSE bdate
+	END AS bdate_new,
+	CASE
+		WHEN gen IS NULL OR TRIM(gen) = '' THEN 'N/A'
+		WHEN UPPER(TRIM(gen)) = 'M' THEN 'Male'
+		WHEN UPPER(TRIM(gen)) = 'F' THEN 'Female'
+		ELSE INITCAP(TRIM(gen))
+	END as gen_new
+FROM bronze.erp_cust_az12;
+
+-- ========================================================================================================================
+-- Table name: silver.erp_loc_a101
+-- Script for loading cleaned bronze.erp_loc_a101 data into the table above
+-- Running this script will truncate existing contents of the above table, then loads current data from the 
+-- file specified in the directory
+
+TRUNCATE TABLE silver.erp_loc_a101;
+INSERT INTO silver.erp_loc_a101 (
+cid,
+cntry
+)
+SELECT
+	REPLACE(cid, '-', '') as cid_new,
+	CASE
+		WHEN cntry IS NULL OR TRIM(cntry) = '' THEN 'N/A'
+		WHEN UPPER(TRIM(cntry)) IN ('US', 'USA') THEN 'United States'
+		WHEN UPPER(TRIM(cntry)) = 'DE' THEN 'Denmark'
+		ELSE INITCAP(TRIM(cntry))
+	END AS cntry_new
+FROM bronze.erp_loc_a101;
+
+-- ========================================================================================================================
+-- Table name: silver.erp_px_cat_g1v2
+-- Script for loading cleaned bronze.erp_px_cat_g1v2 data into the table above
+-- Running this script will truncate existing contents of the above table, then loads current data from the 
+-- file specified in the directory
+
+TRUNCATE TABLE silver.erp_px_cat_g1v2;
+INSERT INTO silver.erp_px_cat_g1v2 (
+id,
+cat,
+subcat,
+maintenance
+)
+SELECT
+	CASE
+		WHEN REPLACE(id, '_', '-') = 'CO-PD' THEN 'CO-PE'
+		ELSE REPLACE(id, '_', '-')
+	END AS id_new,
+	INITCAP(TRIM(cat)) AS cat_new,
+	INITCAP(TRIM(subcat)) AS subcat_new,
+	maintenance
+FROM bronze.erp_px_cat_g1v2;
