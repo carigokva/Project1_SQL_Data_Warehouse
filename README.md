@@ -21,8 +21,8 @@ Specifications
 Objective: Import raw data from the source systems into the bronze layer
 
 Steps:
-* Create and run DDL scripts to create tables that will contain the raw data from source systems.
-* Create and run DML scripts to insert raw data into tables under the bronze layer.
+* Create and run DDL scripts to create tables that will contain the raw data from source systems. ([crm_ddl](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/bronze/bronze_crm_ddl), [erp_ddl](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/bronze/bronze_erp_ddl))
+* Create and run DML scripts to insert raw data into tables under the bronze layer. ([crm dml](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/bronze/bronze_crm_load), [erp dml](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/bronze/bronze_erp_ddl))
 
 ### Building the Silver Layer
 Objective: Clean and transform raw data from the Bronze layer by applying business logic and handling data quality issues.
