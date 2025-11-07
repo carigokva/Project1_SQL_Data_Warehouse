@@ -1,0 +1,59 @@
+-- Scripts for creating customer dimension table / materialized view
+-- All names must use meaningful, business-aligned names for tables, starting with the category prefix.
+-- <layer>.<category>_<entity>
+--	<category>: Describes the role of the table, such as dim (dimension) or fact (fact table)
+--	<entity>: Descriptive name of the table, aligned with the business domain (e.g., customers, products, sales)
+--	Examples:
+--		gold.dim_customers - dimension table for customer data.
+--		gold.fact_sales - fact table for sales transactions.
+
+-- View name: gold.dim_customers
+-- Contains the data of customer dimension table in the gold layer
+-- All customer dimension table in the silver layer are aggregated into a single table
+
+-- Considerations before building the customer dimension table:
+-- Both cust_info and cust_az12 tables have gender information.
+-- If the gender in the cust_info is N/A, then use data from cust_az12 table
+-- t1 = crm_cust_info, t2 = cust_az12, t3 = loc_a101
+-- Select only the needed columns for analysis
+
+/* This is the script to be stored in the customer dimension view
+SELECT
+	t1.cst_id,
+	t1.cst_key,
+	t1.cst_firstname,
+	t1.cst_lastname,
+	t1.cst_marital_status,
+	CASE
+		WHEN t1.cst_gndr = 'N/A' THEN t2.gen
+		ELSE t1.cst_gndr
+	END AS gender,
+	t2.bdate,
+	t3.cntry
+FROM silver.crm_cust_info AS t1
+LEFT JOIN silver.erp_cust_az12 AS t2
+ON t1.cst_key = t2.cid
+LEFT JOIN silver.erp_loc_a101 as t3
+ON t2.cid = t3.cid;
+*/
+
+DROP MATERIALIZED VIEW IF EXISTS gold.dim_customers;
+
+CREATE MATERIALIZED VIEW gold.dim_customers AS
+SELECT
+	t1.cst_id AS customer_id,
+	t1.cst_key AS customer_number,
+	t1.cst_firstname AS first_name,
+	t1.cst_lastname AS last_name,
+	t1.cst_marital_status AS marital_status,
+	CASE
+		WHEN t1.cst_gndr = 'N/A' THEN t2.gen
+		ELSE t1.cst_gndr
+	END AS gender,
+	t2.bdate AS birthdate,
+	t3.cntry AS country
+FROM silver.crm_cust_info AS t1
+LEFT JOIN silver.erp_cust_az12 AS t2
+ON t1.cst_key = t2.cid
+LEFT JOIN silver.erp_loc_a101 as t3
+ON t2.cid = t3.cid;
