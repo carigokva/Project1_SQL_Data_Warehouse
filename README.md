@@ -1,4 +1,4 @@
-# Project1_SQL_Data_Warehouse
+# Project1-SQL-Data-Warehouse
 The Sales Data Warehouse project implements a scalable data warehousing pipeline using the Medallion Architecture framework.
 This repository demonstrates the full lifecycle of building a data warehouse—from raw data ingestion to business-ready data.
 
