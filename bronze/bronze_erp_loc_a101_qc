@@ -1,0 +1,126 @@
+-- Data Quality Check of bronze.erp_loc_a101
+-- inspect all columns, identify what must be unique, what value must be standardized
+-- identify primary key, see if it matches foreign key from referencing table.
+-- identify if there are trailing spaces on text type columns
+-- create script to fix issue per column
+
+SELECT * FROM bronze.erp_loc_a101 LIMIT 10;
+SELECT * FROM silver.crm_cust_info;
+
+-- cid
+-- no duplicated cid value
+-- check for NULL or blank values
+-- no trailing spaces
+-- cid format must be the same with cst_key from silver.crm_cust_info table
+-- cid must match values of cst_key from silver.crm_cust_info table
+
+SELECT cid, COUNT(*)
+FROM bronze.erp_loc_a101
+GROUP BY cid
+HAVING COUNT(*) > 1;
+
+SELECT cid
+FROM bronze.erp_loc_a101
+WHERE cid IS NULL OR cid = '';
+
+SELECT cid
+FROM bronze.erp_loc_a101
+WHERE TRIM(cid) != cid;
+
+SELECT cid FROM bronze.erp_loc_a101 LIMIT 10;
+SELECT cst_key FROM silver.crm_cust_info LIMIT 10;
+
+
+--ISSUES:
+--cid format is 'AW-%' , cst_key format is 'AW%'
+
+--ACTIONS:
+--identify if there are values with different first 3 characters other than 'AW-'
+
+SELECT cid
+FROM bronze.erp_loc_a101
+WHERE cid NOT LIKE 'AW-%';
+
+--remove delimiter '-' with REPLACE() function
+
+SELECT
+	cid,
+	REPLACE(cid, '-', '') AS cid_new
+FROM bronze.erp_loc_a101;
+
+--script to test new query
+--there should be 0 results to indicate that all cid have a match in cst_key from cust_info table
+
+SELECT *
+FROM bronze.erp_loc_a101
+WHERE REPLACE(cid, '-', '') NOT IN (
+									SELECT cst_key FROM silver.crm_cust_info
+)
+
+-- new working query
+SELECT
+	REPLACE(cid, '-', '') as cid_new,
+	cntry
+FROM bronze.erp_loc_a101;
+
+-- =====================================================================================================================
+-- cntry
+-- no trailing space
+-- standardize values
+-- check for NULLs
+-- check for blanks
+
+SELECT DISTINCT cntry FROM bronze.erp_loc_a101;
+--countries are: Australia, Germany, United States, Canada, Denmark, France, United Kingdom
+
+SELECT cntry
+FROM bronze.erp_loc_a101
+WHERE TRIM(cntry) != cntry;
+
+--ISSUES:
+--NULL and blank values
+--there are trailing spaces
+--multiple value with same meaning. US/USA/United States
+--country with only an abbreviation. DE
+
+--ACTION
+--NULL and blank values to 'N/A'
+--standardize values to short name of countries
+
+SELECT 
+	cntry,
+	CASE
+		WHEN cntry IS NULL OR TRIM(cntry) = '' THEN 'N/A'
+		WHEN UPPER(TRIM(cntry)) IN ('US', 'USA') THEN 'United States'
+		WHEN UPPER(TRIM(cntry)) = 'DE' THEN 'Denmark'
+		ELSE INITCAP(TRIM(cntry))
+	END AS cntry_new
+FROM bronze.erp_loc_a101;
+
+--script to test new query
+WITH cte1 as (
+SELECT 
+	CASE
+		WHEN cntry IS NULL OR TRIM(cntry) = '' THEN 'N/A'
+		WHEN UPPER(TRIM(cntry)) IN ('US', 'USA') THEN 'United States'
+		WHEN UPPER(TRIM(cntry)) = 'DE' THEN 'Denmark'
+		ELSE INITCAP(TRIM(cntry))
+	END AS cntry_new
+FROM bronze.erp_loc_a101
+)
+SELECT DISTINCT cntry_new FROM cte1;
+
+
+--new working query
+
+SELECT
+	REPLACE(cid, '-', '') as cid_new,
+	CASE
+		WHEN cntry IS NULL OR TRIM(cntry) = '' THEN 'N/A'
+		WHEN UPPER(TRIM(cntry)) IN ('US', 'USA') THEN 'United States'
+		WHEN UPPER(TRIM(cntry)) = 'DE' THEN 'Denmark'
+		ELSE INITCAP(TRIM(cntry))
+	END AS cntry_new
+FROM bronze.erp_loc_a101;
+
+--Insert the values that result from the query above into the silver.erp_loc_a101
