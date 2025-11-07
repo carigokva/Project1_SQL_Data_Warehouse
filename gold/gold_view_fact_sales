@@ -1,0 +1,57 @@
+-- Scripts for creating sales fact table / materialized view
+-- All names must use meaningful, business-aligned names for tables, starting with the category prefix.
+-- <layer>.<category>_<entity>
+--	<category>: Describes the role of the table, such as dim (dimension) or fact (fact table)
+--	<entity>: Descriptive name of the table, aligned with the business domain (e.g., customers, products, sales)
+--	Examples:
+--		gold.dim_customers - dimension table for customer data.
+--		gold.fact_sales - fact table for sales transactions.
+
+-- View name: gold.fact_sales
+-- Contains the data of sales fact view in the gold layer
+-- All customer dimension table in the silver layer are aggregated into a single table
+
+-- Considerations before building the product dimension table:
+-- t1 = crm_sales_details, t2 = crm_cust_info, t3 = crm_prd_info
+-- Select only the needed columns for analysis
+
+/* This is the script to be stored in the sales fact view
+
+SELECT
+	t1.sls_ord_num AS order_number,
+	t3.prd_key AS product_id,
+	t2.cst_id AS customer_id,
+	t1.sls_order_dt AS order_date,
+	t1.sls_ship_dt AS shipping_date,
+	t1.sls_due_dt AS due_date,
+	t1.sls_sales AS sales_amount,
+	t1.sls_quantity AS quantity,
+	t1.sls_price AS price
+FROM silver.crm_sales_details AS t1
+LEFT JOIN silver.crm_cust_info AS t2
+ON t1.sls_cust_id = t2.cst_id
+LEFT JOIN silver.crm_prd_info AS t3
+ON t1.sls_prd_key = t3.prd_key
+ORDER BY order_date ASC;
+
+*/
+
+DROP MATERIALIZED VIEW IF EXISTS gold.fact_sales;
+
+CREATE MATERIALIZED VIEW gold.fact_sales AS
+SELECT
+	t1.sls_ord_num AS order_number,
+	t3.prd_key AS product_key,
+	t2.cst_id AS customer_key,
+	t1.sls_order_dt AS order_date,
+	t1.sls_ship_dt AS shipping_date,
+	t1.sls_due_dt AS due_date,
+	t1.sls_sales AS sales_amount,
+	t1.sls_quantity AS quantity,
+	t1.sls_price AS price
+FROM silver.crm_sales_details AS t1
+LEFT JOIN silver.crm_cust_info AS t2
+ON t1.sls_cust_id = t2.cst_id
+LEFT JOIN silver.crm_prd_info AS t3
+ON t1.sls_prd_key = t3.prd_key
+ORDER BY order_date ASC;
