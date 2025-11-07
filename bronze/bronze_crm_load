@@ -1,0 +1,41 @@
+-- Scripts for loading table into crm files under bronze layer.
+
+-- Table name: bronze.crm_cust_info
+-- Script for loading raw cust_info.csv into the table above
+-- Running this script will truncate existing contents of the above table, then loads current data from the 
+-- file specified in the directory
+
+TRUNCATE TABLE bronze.crm_cust_info;
+
+COPY bronze.crm_cust_info
+FROM 'C://Users//datasets//source_crm//cust_info.csv' -- replace to the actual full path of the file
+DELIMITER ','
+CSV HEADER;
+
+-- ========================================================================================================================
+
+-- Table name: bronze.crm_prd_info
+-- Script for loading raw prd_info.csv into the table above
+-- Running this script will truncate existing contents of the above table, then loads current data from the 
+-- file specified in the directory
+
+TRUNCATE TABLE bronze.crm_prd_info;
+
+COPY bronze.crm_prd_info
+FROM 'C://Users//Acer Predator Helios//Desktop//CYBER//DATA ANALYTICS//Portfolio//Data Warehousing to PBI analysis//datasets//source_crm//prd_info.csv'
+DELIMITER ','
+CSV HEADER;
+
+-- ========================================================================================================================
+
+-- Table name: bronze.crm_sales_details
+-- Script for loading raw sales_details.csv into the table above
+-- Running this script will truncate existing contents of the above table, then loads current data from the 
+-- file specified in the directory
+
+TRUNCATE TABLE bronze.crm_sales_details;
+
+COPY bronze.crm_sales_details
+FROM 'C://Users//Acer Predator Helios//Desktop//CYBER//DATA ANALYTICS//Portfolio//Data Warehousing to PBI analysis//datasets//source_crm//sales_details.csv'
+DELIMITER ','
+CSV HEADER;
