@@ -21,15 +21,15 @@ Specifications
 Objective: Import raw data from the source systems into the bronze layer
 
 Steps:
-* Create and run DDL scripts to create tables that will contain the raw data from source systems. ([crm_ddl](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/bronze/bronze_crm_ddl), [erp_ddl](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/bronze/bronze_erp_ddl))
+* Create and run DDL scripts to create tables that will contain the raw data from source systems. ([crm ddl](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/bronze/bronze_crm_ddl), [erp ddl](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/bronze/bronze_erp_ddl))
 * Create and run DML scripts to insert raw data into tables under the bronze layer. ([crm dml](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/bronze/bronze_crm_load), [erp dml](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/bronze/bronze_erp_ddl))
 
 ### Building the Silver Layer
 Objective: Clean and transform raw data from the Bronze layer by applying business logic and handling data quality issues.
 
 Steps:
-* Create and run scripts to perform quality check and data transformation on each table in the bronze layer.
-* Create and run scripts to create tables, then insert refined data into Silver Layer tables.
+* Create and run scripts to perform quality check and data transformation on each table in the bronze layer. ([qc scripts](https://github.com/carigokva/Project1_SQL_Data_Warehouse/tree/main/bronze/qc))
+* Create and run scripts to create tables, then insert refined data into Silver Layer tables. DDL: ([crm ddl](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/silver/silver_crm_ddl), [erp ddl](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/silver/silver_erp_ddl)). DML: ([crm load](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/silver/silver_crm_load), [erp load](https://github.com/carigokva/Project1_SQL_Data_Warehouse/blob/main/silver/silver_erp_load)).
 
 ### Building the Gold Layer
 Objective: To deliver curated, high-quality, and analytics-ready data by aggregating and structuring refined datasets from the Silver layer.
