@@ -1,0 +1,171 @@
+-- Data Quality Check of bronze.erp_px_cat_g1v2
+-- inspect all columns, identify what must be unique, what value must be standardized
+-- identify primary key, see if it matches foreign key from referencing table.
+-- identify if there are trailing spaces on text type columns
+-- create script to fix issue per column
+
+SELECT * FROM bronze.erp_px_cat_g1v2 LIMIT 10;
+
+-- id
+-- no duplicated id value
+-- check for NULL or blank values
+-- no trailing spaces
+-- id format must be the same with cat_id from silver.crm_prd_info table
+-- id must match values of cat_id from silver.crm_prd_info
+SELECT id, COUNT(*)
+FROM bronze.erp_px_cat_g1v2
+GROUP BY id
+HAVING COUNT(*) > 1;
+
+SELECT id
+FROM bronze.erp_px_cat_g1v2
+WHERE id IS NULL OR id = '';
+
+SELECT id
+FROM bronze.erp_px_cat_g1v2
+WHERE TRIM(id) != id;
+
+
+SELECT cat_id FROM silver.crm_prd_info LIMIT 10;
+
+--ISSUES:
+--id format is AC_BC , cat_id format is AC-BC
+
+--ACTION:
+--replace '_' delimiter to '-' using REPLACE()
+SELECT
+	id,
+	REPLACE(id, '_', '-')
+FROM bronze.erp_px_cat_g1v2;
+
+
+--script to test new query
+--there should be 0 results to indicate that all cid have a match in cst_key from cust_info table
+SELECT id
+FROM bronze.erp_px_cat_g1v2
+WHERE REPLACE(id, '_', '-') NOT IN (SELECT cat_id FROM silver.crm_prd_info);
+--ISSUE:
+-- CO_PD from id do not have a match in cat_id
+
+--script to identify category id with no match from both tables
+SELECT t1.id, t2.cat_id
+FROM bronze.erp_px_cat_g1v2 t1
+LEFT JOIN silver.crm_prd_info t2
+ON REPLACE(t1.id, '_', '-') = t2.cat_id
+WHERE t2.cat_id IS NULL;
+
+SELECT t1.id, t2.cat_id
+FROM bronze.erp_px_cat_g1v2 t1
+RIGHT JOIN silver.crm_prd_info t2
+ON REPLACE(t1.id, '_', '-') = t2.cat_id
+WHERE t1.id IS NULL;
+
+-- 'CO-PE' from cat_id and 'CO_PD' from id do not have a match
+--ACTION:
+--replace 'CO_PD' to 'CO-PE' in the erp_px_cat_g1v2 table
+
+SELECT
+	id,
+	CASE
+		WHEN REPLACE(id, '_', '-') = 'CO-PD' THEN 'CO-PE'
+		ELSE REPLACE(id, '_', '-')
+	END AS id_new
+FROM bronze.erp_px_cat_g1v2;
+
+--new working query
+SELECT
+	CASE
+		WHEN REPLACE(id, '_', '-') = 'CO-PD' THEN 'CO-PE'
+		ELSE REPLACE(id, '_', '-')
+	END AS id_new,
+	cat,
+	subcat,
+	maintenance
+FROM bronze.erp_px_cat_g1v2;
+
+
+-- =====================================================================================================================
+-- cat
+-- no trailing space
+-- standardize values
+-- check for NULLs
+-- check for blanks
+
+SELECT DISTINCT cat
+FROM bronze.erp_px_cat_g1v2;
+
+SELECT cat
+FROM bronze.erp_px_cat_g1v2
+WHERE TRIM(cat) != cat OR cat IS NULL OR TRIM(cat) = '';
+
+--ISSUES: NONE
+--new working query
+SELECT
+	CASE
+		WHEN REPLACE(id, '_', '-') = 'CO-PD' THEN 'CO-PE'
+		ELSE REPLACE(id, '_', '-')
+	END AS id_new,
+	INITCAP(TRIM(cat)),
+	subcat,
+	maintenance
+FROM bronze.erp_px_cat_g1v2;
+
+-- =====================================================================================================================
+-- subcat
+-- no trailing space
+-- standardize values
+-- check for NULLs
+-- check for blanks
+
+SELECT DISTINCT subcat
+FROM bronze.erp_px_cat_g1v2;
+
+SELECT subcat
+FROM bronze.erp_px_cat_g1v2
+WHERE INITCAP(TRIM(subcat)) != subcat OR subcat IS NULL OR TRIM(subcat) = '';
+
+SELECT subcat
+FROM bronze.erp_px_cat_g1v2
+WHERE INITCAP(TRIM(subcat)) != subcat
+
+--ISSUE
+--not all words are capitalized: 'Bottles and Cages' 'Tires and Tubes'
+--initcap is used to identify records with same meaning but with different capitalization
+
+--ACTION:
+--use INITCAP to capitalize even if the word is 'and'
+
+--new working query
+SELECT
+	CASE
+		WHEN REPLACE(id, '_', '-') = 'CO-PD' THEN 'CO-PE'
+		ELSE REPLACE(id, '_', '-')
+	END AS id_new,
+	INITCAP(TRIM(cat)) AS cat_new,
+	INITCAP(TRIM(subcat)) AS subcat_new,
+	maintenance
+FROM bronze.erp_px_cat_g1v2;
+
+-- =====================================================================================================================
+-- maintenance
+-- no trailing space
+-- standardize values
+-- check for NULLs
+-- check for blanks
+
+SELECT DISTINCT maintenance FROM bronze.erp_px_cat_g1v2;
+
+--ISSUES: NONE
+
+--new working query
+SELECT
+	CASE
+		WHEN REPLACE(id, '_', '-') = 'CO-PD' THEN 'CO-PE'
+		ELSE REPLACE(id, '_', '-')
+	END AS id_new,
+	INITCAP(TRIM(cat)) AS cat_new,
+	INITCAP(TRIM(subcat)) AS subcat_new,
+	maintenance
+FROM bronze.erp_px_cat_g1v2;
+
+--Insert the values that result from the query above into the silver.px_erp_px_cat
