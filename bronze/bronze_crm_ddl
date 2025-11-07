@@ -1,0 +1,49 @@
+-- Scripts for creating table for crm files under bronze layer.
+
+-- Table name: bronze.crm_cust_info
+-- Script for creating crm_cust_info table in the bronze schema
+-- Running this script will delete existing table named as above, then creates new table.
+DROP TABLE IF EXISTS bronze.crm_cust_info;
+CREATE TABLE bronze.crm_cust_info (
+	cst_id INT,
+	cst_key varchar(256),
+	cst_firstname varchar(256),
+	cst_lastname varchar(256),
+	cst_marital_status varchar(256),
+	cst_gndr varchar(256),
+	cst_create_date DATE
+);
+
+-- ========================================================================================================================
+
+-- Table name: bronze.crm_prd_info
+-- Script for creating crm_prd_info table in the bronze schema
+-- Running this script will delete existing table named as above, then creates new table.
+DROP TABLE IF EXISTS bronze.crm_prd_info;
+CREATE TABLE bronze.crm_prd_info (
+	prd_id INT,
+	prd_key varchar(256),
+	prd_nm varchar(256),
+	prd_cost INT,
+	prd_line varchar(256),
+	prd_start_dt DATE,
+	prd_end_dt DATE
+);
+
+-- ========================================================================================================================
+
+-- Table name: bronze.crm_sales_details
+-- Script for creating crm_sales_details table in the bronze schema
+-- Running this script will delete existing table named as above, then creates new table.
+DROP TABLE IF EXISTS bronze.crm_sales_details;
+CREATE TABLE bronze.crm_sales_details (
+	sls_ord_num varchar(256),
+	sls_prd_key varchar(256),
+	sls_cust_id INT,
+	sls_order_dt INT,
+	sls_ship_dt INT,
+	sls_due_dt INT,
+	sls_sales INT,
+	sls_quantity INT,
+	sls_price INT
+);
