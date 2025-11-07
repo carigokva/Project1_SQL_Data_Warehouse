@@ -1,0 +1,297 @@
+-- Data Quality Check of bronze.crm_prd_info
+-- inspect all columns, identify what must be unique, what value must be standardized
+-- identify primary key, see if it matches foreign key from referencing table.
+-- identify if there are trailing spaces on text type columns
+-- create script to fix issue per column
+
+SELECT * FROM bronze.crm_prd_info LIMIT 1;
+
+-- prd_id
+-- all value of prd_id must be unique
+-- there must be no NULL values
+SELECT prd_id, COUNT(*)
+FROM bronze.crm_prd_info
+GROUP BY prd_id
+HAVING COUNT(*) > 1;
+
+SELECT prd_id
+FROM bronze.crm_prd_info
+WHERE prd_id IS NULL;
+
+-- ISSUES: NONE
+
+-- ====================================================================================================================
+-- prd_key
+-- there must be no NULL values
+-- there must be no trailing space
+-- there must be no duplicate values
+-- prd_key must match sls_prd_key in sales_details table
+-- cat_key derived from old prd_key must match id on erp_px_cat_g1v2
+SELECT prd_key
+FROM bronze.crm_prd_info
+WHERE prd_key IS NULL;
+
+SELECT DISTINCT prd_key
+FROM bronze.crm_prd_info
+WHERE prd_key != TRIM(prd_key);
+
+SELECT sls_prd_key
+FROM bronze.crm_sales_details
+WHERE sls_prd_key NOT IN (SELECT prd_key FROM bronze.crm_prd_info);
+
+-- ACTION:
+-- extract new prd_key from old prd_key using SUBSTRING function
+-- extract cat_key from old_prd_key, then replace delimiter from '-' to '_'
+-- prd_key with the latest start_dt will be retained from duplicate values
+
+SELECT
+	prd_id,
+	prd_key,
+	prd_nm,
+	prd_cost,
+	prd_line,
+	prd_start_dt,
+	prd_end_dt
+FROM(
+	SELECT
+		*,
+		ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+	FROM bronze.crm_prd_info)
+WHERE rownum = 1
+
+
+SELECT prd_key, substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new
+FROM bronze.crm_prd_info;
+
+SELECT prd_key, substring(prd_key FROM 1 FOR 5 ) AS cat_key
+FROM bronze.crm_prd_info;
+
+-- to check: prd_key must match sls_prd_key in sales_details table
+SELECT sls_prd_key
+FROM bronze.crm_sales_details
+WHERE sls_prd_key NOT IN (SELECT substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS extracted_value
+FROM bronze.crm_prd_info);
+
+-- script to clean the table as a whole
+SELECT
+	prd_id,
+	substring(prd_key FROM 1 FOR 5 ) AS cat_key,
+	substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new,
+	prd_nm,
+	prd_cost,
+	prd_line,
+	prd_start_dt,
+	prd_end_dt
+FROM(
+	SELECT
+		*,
+		ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+	FROM bronze.crm_prd_info)
+WHERE rownum = 1
+
+-- ====================================================================================================================
+-- prd_nm
+-- check for trailing space
+
+with cte1 AS (SELECT
+					prd_id,
+					substring(prd_key FROM 1 FOR 5 ) AS cat_key,
+					substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new,
+					prd_nm,
+					prd_cost,
+					prd_line,
+					prd_start_dt,
+					prd_end_dt
+				FROM(
+					SELECT
+						*,
+						ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+					FROM bronze.crm_prd_info)
+				WHERE rownum = 1)
+
+SELECT prd_nm
+FROM cte1
+WHERE prd_nm != TRIM(prd_nm);
+
+--ISSUES: NONE
+
+-- ====================================================================================================================
+-- prd_cost
+-- no negative values
+-- no nulls
+
+with cte1 AS (SELECT
+					prd_id,
+					substring(prd_key FROM 1 FOR 5 ) AS cat_key,
+					substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new,
+					prd_nm,
+					prd_cost,
+					prd_line,
+					prd_start_dt,
+					prd_end_dt
+				FROM(
+					SELECT
+						*,
+						ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+					FROM bronze.crm_prd_info)
+				WHERE rownum = 1)
+
+SELECT prd_cost
+FROM cte1
+WHERE prd_cost IS NULL OR prd_cost < 0;
+
+--ISSUE: null values
+--ACTION: use COALESCE() to replace NULL values to 0
+--Convert to data type = decimal
+
+SELECT
+	prd_id,
+	substring(prd_key FROM 1 FOR 5 ) AS cat_key,
+	substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new,
+	prd_nm,
+	CAST(COALESCE(prd_cost, 0) AS DECIMAL(10,2)) as prd_cost_new,
+	prd_line,
+	prd_start_dt,
+	prd_end_dt
+FROM(
+	SELECT
+		*,
+		ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+	FROM bronze.crm_prd_info)
+WHERE rownum = 1
+
+-- ====================================================================================================================
+-- prd_line
+-- no trailing space
+-- standardize values
+
+with cte1 as (SELECT
+	prd_id,
+	substring(prd_key FROM 1 FOR 5 ) AS cat_key,
+	substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new,
+	prd_nm,
+	COALESCE(prd_cost, 0) as prd_cost_new,
+	prd_line,
+	prd_start_dt,
+	prd_end_dt
+FROM(
+	SELECT
+		*,
+		ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+	FROM bronze.crm_prd_info)
+WHERE rownum = 1)
+
+SELECT DISTINCT prd_line
+FROM cte1;
+
+with cte1 as (SELECT
+	prd_id,
+	substring(prd_key FROM 1 FOR 5 ) AS cat_key,
+	substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new,
+	prd_nm,
+	COALESCE(prd_cost, 0) as prd_cost_new,
+	prd_line,
+	prd_start_dt,
+	prd_end_dt
+FROM(
+	SELECT
+		*,
+		ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+	FROM bronze.crm_prd_info)
+WHERE rownum = 1)
+
+SELECT prd_line
+FROM cte1
+WHERE prd_line = TRIM(prd_line);
+
+--ISSUE:
+--NULL values
+--Values have no meaning 'M' must be 'Mountain' etc..
+--trailing spaces
+
+--ACTION
+--NULL values to 'N/A'
+--Convert existing values
+
+SELECT
+	prd_id,
+	substring(prd_key FROM 1 FOR 5 ) AS cat_key,
+	substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new,
+	prd_nm,
+	COALESCE(prd_cost, 0) as prd_cost_new,
+	CASE
+		WHEN TRIM(prd_line) = 'M' THEN 'Mountain'
+		WHEN TRIM(prd_line) = 'R' THEN 'Road'
+		WHEN TRIM(prd_line) = 'S' THEN 'Other sales'
+		WHEN TRIM(prd_line) = 'T' THEN 'Touring'
+		ELSE 'N/A'
+	END as prd_line_new,
+	prd_start_dt,
+	prd_end_dt
+FROM(
+	SELECT
+		*,
+		ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+	FROM bronze.crm_prd_info)
+WHERE rownum = 1
+
+-- ====================================================================================================================
+-- prd_start_dt and prd_end_dt
+-- prd_end_dt > prd_start_dt
+-- prd_start_dt != NULL
+
+with cte1 as (SELECT
+	prd_id,
+	substring(prd_key FROM 1 FOR 5 ) AS cat_key,
+	substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new,
+	prd_nm,
+	COALESCE(prd_cost, 0) as prd_cost_new,
+	CASE
+		WHEN TRIM(prd_line) = 'M' THEN 'Mountain'
+		WHEN TRIM(prd_line) = 'R' THEN 'Road'
+		WHEN TRIM(prd_line) = 'S' THEN 'Other sales'
+		WHEN TRIM(prd_line) = 'T' THEN 'Touring'
+		ELSE 'N/A'
+	END as prd_line_new,
+	prd_start_dt,
+	prd_end_dt
+FROM(
+	SELECT
+		*,
+		ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+	FROM bronze.crm_prd_info))
+SELECT prd_start_dt, prd_end_dt
+FROM cte1
+WHERE prd_start_dt IS NULL OR prd_start_dt > prd_end_dt;
+--ISSUE:
+-- there are rows with prd_start_dt > prd_end_dt
+
+--ACTION:
+-- make prd_start_dt as the basis of prd_end_dt. use LEAD()
+
+SELECT
+	prd_id,
+	substring(prd_key FROM 1 FOR 5 ) AS cat_key,
+	substring(prd_key FROM '^[^-]*-[^-]*-(.*)$') AS prd_key_new,
+	prd_nm,
+	CAST(COALESCE(prd_cost, 0) AS DECIMAL(10,2)) as prd_cost_new,
+	CASE
+		WHEN TRIM(prd_line) = 'M' THEN 'Mountain'
+		WHEN TRIM(prd_line) = 'R' THEN 'Road'
+		WHEN TRIM(prd_line) = 'S' THEN 'Other sales'
+		WHEN TRIM(prd_line) = 'T' THEN 'Touring'
+		ELSE 'N/A'
+	END as prd_line_new,
+	prd_start_dt,
+	CASE
+		WHEN prd_start_dt > prd_end_dt THEN (LEAD(prd_start_dt) OVER (PARTITION BY prd_key ORDER BY prd_start_dt)) - 1
+        ELSE prd_end_dt
+	END as prd_end_dt_new
+FROM(
+	SELECT
+		*,
+		ROW_NUMBER() OVER (PARTITION BY prd_key ORDER BY prd_start_dt DESC) as rownum
+	FROM bronze.crm_prd_info)
+WHERE rownum = 1;
+
+--Insert the values that result from the query above into the silver_crm_prd_info table
