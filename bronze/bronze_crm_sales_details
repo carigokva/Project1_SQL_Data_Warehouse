@@ -1,0 +1,249 @@
+-- Data Quality Check of bronze.crm_sales_details
+-- inspect all columns, identify what must be unique, what value must be standardized
+-- identify primary key, see if it matches foreign key from referencing table.
+-- identify if there are trailing spaces on text type columns
+-- create script to fix issue per column
+
+SELECT * FROM bronze.crm_sales_details LIMIT 10;
+
+-- sls_ord_num
+-- there must be no NULL values
+SELECT sls_ord_num
+FROM bronze.crm_sales_details
+WHERE sls_ord_num IS NULL;
+
+-- ISSUES: NONE
+
+
+-- ====================================================================================================================
+-- sls_prd_key
+-- all unique sls_prd_key must have a corresponding primary key
+-- no trailing space
+-- no NULLs
+
+SELECT sls_prd_key
+FROM bronze.crm_sales_details
+WHERE sls_prd_key IS NULL;
+
+SELECT sls_prd_key
+FROM bronze.crm_sales_details
+WHERE sls_prd_key != TRIM(sls_prd_key);
+
+-- ISSUES: NONE
+
+
+-- ====================================================================================================================
+-- sls_cust_id
+-- all unique sls_cust_id must have a corresponding primary key
+-- no NULLs
+
+SELECT sls_cust_id
+FROM bronze.crm_sales_details
+WHERE sls_cust_id NOT IN (
+	SELECT cst_id FROM bronze.crm_cust_info
+);
+
+SELECT sls_cust_id
+FROM bronze.crm_sales_details
+WHERE sls_cust_id IS NULL;
+
+--ISSUES: NONE
+
+-- ====================================================================================================================
+-- sls_order_dt
+-- sls_order_dt < sls_ship_dt && sls_order_dt < sls_due_dt
+-- no NULLs
+-- length of value must be = 8
+
+-- script to identify valid start and end date of sales data
+SELECT MAX(sls_order_dt), MIN(sls_order_dt)
+FROM bronze.crm_sales_details
+WHERE LENGTH(CAST(sls_order_dt AS TEXT)) = 8;
+
+-- script to identify invalid start and end date of sales data
+SELECT sls_order_dt
+FROM bronze.crm_sales_details
+WHERE LENGTH(CAST(sls_order_dt AS TEXT)) != 8 OR sls_order_dt IS NULL;
+
+SELECT sls_order_dt, sls_ship_dt, sls_due_dt
+FROM bronze.crm_sales_details
+WHERE sls_due_dt < sls_ship_dt AND sls_ship_dt < sls_order_dt;
+--ISSUES:
+--sls_order_dt with length != 8
+
+--ACTIONS:
+-- if sls_order_dt IS NULL or length !=8, use the sls_ship_dt value as basis. subtract 7 days to get value
+
+SELECT sls_order_dt, sls_ship_dt,
+	CASE
+		WHEN sls_order_dt IS NULL OR 
+			 LENGTH(CAST(sls_order_dt AS TEXT)) != 8 OR
+			 sls_order_dt > sls_ship_dt
+		THEN to_date(sls_ship_dt::TEXT, 'YYYYMMDD') - 7
+		ELSE to_date(sls_ship_dt::TEXT, 'YYYYMMDD')
+	END as sls_order_dt_new
+FROM bronze.crm_sales_details
+WHERE LENGTH(CAST(sls_order_dt AS TEXT)) != 8 OR sls_order_dt IS NULL;
+
+-- ====================================================================================================================
+-- sls_ship_dt, sls_due_dt
+-- sls_order_dt < sls_ship_dt && sls_order_dt < sls_due_dt
+-- no NULLs
+-- length of value must be = 8
+
+SELECT MAX(sls_ship_dt), MIN(sls_ship_dt)
+FROM bronze.crm_sales_details
+WHERE LENGTH(CAST(sls_ship_dt AS TEXT)) = 8;
+
+SELECT sls_ship_dt
+FROM bronze.crm_sales_details
+WHERE LENGTH(CAST(sls_ship_dt AS TEXT)) != 8;
+
+SELECT MAX(sls_due_dt), MIN(sls_due_dt)
+FROM bronze.crm_sales_details
+WHERE LENGTH(CAST(sls_due_dt AS TEXT)) = 8;
+
+SELECT sls_due_dt
+FROM bronze.crm_sales_details
+WHERE LENGTH(CAST(sls_due_dt AS TEXT)) != 8;
+
+
+--ISSUES: NONE
+
+-- ===========================================================================================================
+--working query
+SELECT
+	sls_ord_num,
+	sls_prd_key,
+	sls_cust_id,
+	CASE
+		WHEN sls_order_dt IS NULL OR 
+			 LENGTH(CAST(sls_order_dt AS TEXT)) != 8 OR
+			 sls_order_dt > sls_ship_dt
+		THEN to_date(sls_ship_dt::TEXT, 'YYYYMMDD') - 7
+		ELSE to_date(sls_order_dt::TEXT, 'YYYYMMDD')
+	END as sls_order_dt_new,
+	to_date(sls_ship_dt::TEXT, 'YYYYMMDD') AS sls_ship_dt_new,
+	to_date(sls_due_dt::TEXT, 'YYYYMMDD') AS sls_due_dt_new,
+	sls_sales,
+	sls_quantity,
+	sls_price
+FROM bronze.crm_sales_details
+
+-- ===========================================================================================================
+-- sls_sales
+-- sls_sales = sls_quantity * sls_price
+-- no NULLs
+-- sls_sales > 0
+
+SELECT sls_sales
+FROM bronze.crm_sales_details
+WHERE sls_sales IS NULL;
+
+--ISSUES:
+--null values
+--there are sls_sales != sls_quantity * sls_price
+--there are negative sls_price
+
+SELECT sls_sales, sls_quantity, sls_price
+FROM bronze.crm_sales_details
+WHERE sls_sales != (sls_quantity * sls_price);
+
+--ACTION:
+--new sls_sales = ABS(sls_quantity * sls_price)
+--change data type to decimal with up to 2 decimal value
+SELECT sls_sales, sls_quantity, sls_price,
+	CASE
+		WHEN sls_sales IS NULL OR sls_sales < 0 OR sls_sales != ABS(sls_quantity * sls_price)
+		THEN CAST(ABS(sls_quantity * sls_price) AS DECIMAL(10,2))
+		ELSE CAST(sls_sales AS DECIMAL(10,2))
+	END AS sls_sales_new
+FROM bronze.crm_sales_details
+WHERE sls_sales != (sls_quantity * sls_price);
+
+-- ===========================================================================================================
+-- sls_quantity
+-- quantity > 0
+-- no NULLs
+
+SELECT sls_quantity
+FROM bronze.crm_sales_details
+WHERE sls_quantity IS NULL;
+
+SELECT sls_quantity
+FROM bronze.crm_sales_details
+WHERE sls_quantity <= 0;
+
+SELECT sls_quantity
+FROM bronze.crm_sales_details
+WHERE sls_quantity > 1;
+
+--ISSUES: NONE
+
+
+-- ===========================================================================================================
+-- sls_price
+-- sls_price = sls_sales / sls_quantity
+-- no NULLs
+-- sls_price > 0
+-- no negative values
+
+SELECT sls_price
+FROM bronze.crm_sales_details
+WHERE sls_price < 0;
+
+SELECT sls_price
+FROM bronze.crm_sales_details
+WHERE sls_price = 0;
+
+SELECT sls_price
+FROM bronze.crm_sales_details
+WHERE sls_price IS NULL;
+
+--ISSUES:
+--NULL values
+--negative values
+
+--ACTION:
+--derive new value from sales and quantity if null
+--if value is negative, use ABS() to make it positive
+
+SELECT 
+	sls_price, sls_quantity, sls_sales,
+	CASE
+		WHEN sls_price IS NULL OR sls_price = 0 THEN CAST(ABS(sls_sales / sls_quantity) AS DECIMAL(10,2))
+		WHEN sls_price < 0 THEN CAST(ABS(sls_price) AS DECIMAL(10,2))
+		ELSE CAST(sls_price AS DECIMAL(10,2))
+	END AS sls_price_new
+FROM bronze.crm_sales_details
+WHERE sls_price IS NULL OR sls_price < 0;
+
+
+-- ===========================================================================================================
+--working query
+SELECT
+	sls_ord_num,
+	sls_prd_key,
+	sls_cust_id,
+	CASE
+		WHEN sls_order_dt IS NULL OR 
+			 LENGTH(CAST(sls_order_dt AS TEXT)) != 8 OR
+			 sls_order_dt > sls_ship_dt
+		THEN to_date(sls_ship_dt::TEXT, 'YYYYMMDD') - 7
+		ELSE to_date(sls_order_dt::TEXT, 'YYYYMMDD')
+	END as sls_order_dt_new,
+	to_date(sls_ship_dt::TEXT, 'YYYYMMDD') AS sls_ship_dt_new,
+	to_date(sls_due_dt::TEXT, 'YYYYMMDD') AS sls_due_dt_new,
+	CASE
+		WHEN sls_sales IS NULL OR sls_sales < 0 OR sls_sales != ABS(sls_quantity * sls_price)
+		THEN CAST(ABS(sls_quantity * sls_price) AS DECIMAL(10,2))
+		ELSE CAST(sls_sales AS DECIMAL(10,2))
+	END AS sls_sales_new,
+	sls_quantity,
+	CASE
+		WHEN sls_price IS NULL OR sls_price = 0 THEN CAST(ABS(sls_sales / sls_quantity) AS DECIMAL(10,2))
+		WHEN sls_price < 0 THEN CAST(ABS(sls_price) AS DECIMAL(10,2))
+		ELSE CAST(sls_price AS DECIMAL(10,2))
+	END AS sls_price_new
+FROM bronze.crm_sales_details;
+--Insert the values that result from the query above into the silver.crm_sales_details
